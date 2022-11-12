@@ -1,0 +1,7 @@
+{{define "home"}}
+{{if eq .verifiedNumber ""}}
+Welcome new user!
+{{else}}
+Your phone number: {{.verifiedNumber}}
+{{end}}
+{{end}}
