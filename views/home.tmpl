@@ -1,7 +1,18 @@
-{{define "home"}}
-{{if eq .verifiedNumber ""}}
-Welcome new user!
-{{else}}
-Your phone number: {{.verifiedNumber}}
-{{end}}
-{{end}}
+{{ define "home" }}
+{{ if . }}
+<p>Welcome verified user!</p>
+{{ else }}
+<p>Welcome new user!</p>
+<div>
+  <form action="/verify" method="post">
+    <div>
+      <label for="tel">認証する電話番号</label>
+      <input type="text" id="tel" name="tel">
+    </div>
+    <div>
+      <input type="submit" value="認証する">
+    </div>
+  </form>
+</div>
+{{ end }}
+{{ end }}

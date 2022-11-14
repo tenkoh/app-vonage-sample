@@ -1,0 +1,13 @@
+{{ define "pinform" }}
+<div>
+  <form action="/check" method="post">
+    <div>
+      <label for="pin">PINコード</label>
+      <input type="text" id="pin" name="pin">
+    </div>
+    <div>
+      <input type="submit" value="PINコードを送信">
+    </div>
+  </form>
+</div>
+{{ end }}
