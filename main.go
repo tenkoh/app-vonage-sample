@@ -31,16 +31,14 @@ var (
 )
 
 func init() {
-	k := os.Getenv("VONAGE_API_KEY")
-	if k == "" {
+	apiKey = os.Getenv("VONAGE_API_KEY")
+	if apiKey == "" {
 		panic("not found vonage api key in env")
 	}
-	s := os.Getenv("VONAGE_API_SECRET")
-	if s == "" {
+	apiSecret = os.Getenv("VONAGE_API_SECRET")
+	if apiSecret == "" {
 		panic("not found vonage api secret in env")
 	}
-	apiKey = k
-	apiSecret = s
 }
 
 // implatement echo.Template interface
@@ -68,17 +66,15 @@ func home(c echo.Context) error {
 	return c.Render(http.StatusOK, "home", v)
 }
 
-// verify handler starts verify process using vonage api.
-// tel number must be passed via form.
 func verify(c echo.Context) error {
 	tel := c.FormValue("tel")
-	// validation
 	if !isValidTel(tel) {
 		return c.HTML(
 			http.StatusBadRequest,
 			`<html><p>invalid telephone number</p><a href="/">go to home</a></html>`,
 		)
 	}
+
 	// start verify process using vonage api
 	reqID, err := requestVerify(c)
 	if err != nil && !errors.Is(err, errConcurrentRequest) {
