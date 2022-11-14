@@ -1,23 +1,47 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
-	"log"
 	"net/http"
 	"os"
+	"regexp"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/vonage/vonage-go-sdk"
 )
 
 const (
+	brandName     = "vonage-go-sample"
 	sessionName   = "vonage-go-sample"
 	sessionMaxAge = 120
 )
+
+var (
+	apiKey               string
+	apiSecret            string
+	errConcurrentRequest = errors.New("there is a concurrent verification request in-progress")
+	telValidation        = regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
+	pinValidation        = regexp.MustCompile(`^\d{4}$`)
+)
+
+func init() {
+	k := os.Getenv("VONAGE_API_KEY")
+	if k == "" {
+		panic("not found vonage api key in env")
+	}
+	s := os.Getenv("VONAGE_API_SECRET")
+	if s == "" {
+		panic("not found vonage api secret in env")
+	}
+	apiKey = k
+	apiSecret = s
+}
 
 // implatement echo.Template interface
 type Template struct {
@@ -48,14 +72,16 @@ func home(c echo.Context) error {
 // tel number must be passed via form.
 func verify(c echo.Context) error {
 	tel := c.FormValue("tel")
-	log.Printf("requested telephone number: %s\n", tel)
 	// validation
-	if !isValidNumber(tel) {
-		return c.String(http.StatusBadRequest, "invalid telephone number")
+	if !isValidTel(tel) {
+		return c.HTML(
+			http.StatusBadRequest,
+			`<html><p>invalid telephone number</p><a href="/">go to home</a></html>`,
+		)
 	}
 	// start verify process using vonage api
 	reqID, err := requestVerify(c)
-	if err != nil {
+	if err != nil && !errors.Is(err, errConcurrentRequest) {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
@@ -110,26 +136,66 @@ func check(c echo.Context) error {
 }
 
 func requestVerify(c echo.Context) (reqID string, _ error) {
-	return "foobar", nil
+	auth := vonage.CreateAuthFromKeySecret(apiKey, apiSecret)
+	verifyClient := vonage.NewVerifyClient(auth)
+
+	resp, respErr, err := verifyClient.Request(c.FormValue("tel"), brandName, vonage.VerifyOpts{
+		// https://developer.vonage.com/api/verify
+		PinExpiry:  sessionMaxAge,
+		Lg:         "ja-jp",
+		WorkflowID: 6, //only sms (one time)
+	})
+	if err != nil {
+		return "", err
+	}
+	if t := respErr.ErrorText; t != "" {
+		if id := respErr.RequestId; id != "" {
+			return id, errConcurrentRequest
+		}
+		return "", fmt.Errorf("fail to start verification, status=%s, detail=%s", respErr.Status, t)
+	}
+	return resp.RequestId, nil
 }
 
 func requestCheck(c echo.Context) (verified bool, _ error) {
-	return false, nil
+	auth := vonage.CreateAuthFromKeySecret(apiKey, apiSecret)
+	verifyClient := vonage.NewVerifyClient(auth)
+
+	sess, err := session.Get(sessionName, c)
+	if err != nil {
+		return false, fmt.Errorf("fail to call session: %w", err)
+	}
+	r := sess.Values["requestID"]
+	reqID, ok := r.(string)
+	if !ok {
+		return false, errors.New("invalid requestID in this session")
+	}
+	if reqID == "" {
+		return false, errors.New("invalid requestID in this session")
+	}
+	pin := c.FormValue("pin")
+	if !isValidPin(pin) {
+		return false, errors.New("invalid pin code")
+	}
+	_, respErr, err := verifyClient.Check(reqID, pin)
+	if err != nil {
+		return false, err
+	}
+	if t := respErr.ErrorText; t != "" {
+		if id := respErr.RequestId; id != "" {
+			return false, errConcurrentRequest
+		}
+		return false, fmt.Errorf("fail to start verification, status=%s, detail=%s", respErr.Status, t)
+	}
+	return true, nil
 }
 
-func isValidNumber(tel string) bool {
-	if tel == "" {
-		return false
-	}
-	return true
+func isValidTel(tel string) bool {
+	return telValidation.MatchString(tel)
 }
 
 func isValidPin(pin string) bool {
-	return true
-}
-
-func cleanTel(tel string) string {
-	return tel
+	return pinValidation.MatchString(pin)
 }
 
 func main() {
