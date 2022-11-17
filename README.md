@@ -9,6 +9,9 @@ sample web application using Vonage for 2FA
 2. Enter your phone number and submit. Then you will get a SMS giving 4 digits PIN code.
 3. Enter the PIN code and submit. If succeed, you are redirected to the top page at a verified user.
 
+**NOTICE**
+You have to pay fee for each verification with the Vonage service. (And perhaps you would need to pay some reception payment for SMS)
+
 ## Usage
 1. Set environment variables. Vonage API key & secret are provided on Vonage. (need to register)
    - VONAGE_API_KEY
