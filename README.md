@@ -15,7 +15,7 @@ sample web application using Vonage for 2FA
 1. Set environment variables. Vonage API key & secret are provided on Vonage. (need to register)
    - VONAGE_API_KEY
    - VONAGE_API_SECRET
-   - SESSION_SECRET (optional)
+   - SESSION_AUTH_KEY (optional)
 2. Clone this repository.
 3. `go run .`
 4. Access to `http://localhost:1323`.
